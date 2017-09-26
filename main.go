@@ -14,7 +14,7 @@
 
 package main
 
-import "github.com/mpopadic/go_n_find/find/cmd"
+import "github.com/mpopadic/go_n_find/cmd"
 
 func main() {
 	cmd.Execute()
