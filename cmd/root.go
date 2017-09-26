@@ -48,14 +48,16 @@ var RootCmd = &cobra.Command{
 	// Uncomment the following line if your bare application
 	// has an action associated with it:
 	RunE: func(cmd *cobra.Command, args []string) error {
-		// fmt.Println(pathFlag, nameFlag)
-		fmt.Println("replace:", replaceFlag)
+
+		// Set findOptions
 		options := &findOptions{
 			Path:              pathFlag,
 			Name:              nameFlag,
+			ReplaceWith:       replaceFlag,
 			IgnoreCase:        ignoreCaseFlag,
 			ShowAbsolutePaths: showAbsolutePathsFlag,
 		}
+
 		if err := findInTree(options); err != nil {
 			return err
 		}
@@ -109,22 +111,47 @@ func findInTree(options *findOptions) error {
 func doAction(options *findOptions) {
 	if options.Name != "" {
 		var finalPathPrint = ""
+		absolutePath, err := filepath.Abs(options.Path)
+		if err != nil {
+			log.Fatalf("could not get absolute path: %v", err)
+		}
 		if options.ShowAbsolutePaths {
-			p, err := filepath.Abs(options.Path)
-			if err != nil {
-				log.Fatalf("could not get absolute path: %v", err)
-			}
-			finalPathPrint = p
+			finalPathPrint = absolutePath
 		} else {
 			finalPathPrint = options.Path
 		}
 		if options.IgnoreCase {
-			if strings.Contains(strings.ToLower(options.Path), strings.ToLower(options.Name)) {
-				fmt.Println(finalPathPrint)
+			if strings.Contains(strings.ToLower(filepath.Base(absolutePath)), strings.ToLower(options.Name)) {
+				if options.ReplaceWith != "" {
+					oldName := filepath.Base(absolutePath)
+					pathDir := filepath.Dir(absolutePath)
+					newName := strings.Replace(oldName, options.Name, options.ReplaceWith, -1)
+
+					err := os.Rename(absolutePath, filepath.FromSlash(path.Join(pathDir, newName)))
+					if err != nil {
+						fmt.Printf("could not rename file: %v", err)
+					}
+					fmt.Printf("%s => %s\n", absolutePath, filepath.FromSlash(path.Join(pathDir, newName)))
+
+				} else {
+					fmt.Println(finalPathPrint)
+				}
 			}
 		} else {
-			if strings.Contains(options.Path, options.Name) {
-				fmt.Println(finalPathPrint)
+			if strings.Contains(filepath.Base(absolutePath), options.Name) {
+				if options.ReplaceWith != "" {
+					oldName := filepath.Base(absolutePath)
+					pathDir := filepath.Dir(absolutePath)
+					newName := strings.Replace(oldName, options.Name, options.ReplaceWith, -1)
+
+					err := os.Rename(absolutePath, filepath.FromSlash(path.Join(pathDir, newName)))
+					if err != nil {
+						fmt.Printf("could not rename file: %v", err)
+					}
+					fmt.Printf("%s => %s\n", absolutePath, filepath.FromSlash(path.Join(pathDir, newName)))
+				} else {
+					fmt.Println(finalPathPrint)
+				}
 			}
 		}
 	}
@@ -133,6 +160,7 @@ func doAction(options *findOptions) {
 type findOptions struct {
 	Path              string
 	Name              string
+	ReplaceWith       string
 	IgnoreCase        bool
 	ShowAbsolutePaths bool
 }
@@ -141,6 +169,7 @@ func (o *findOptions) CreateCopy() *findOptions {
 	newFindOptions := &findOptions{
 		Path:              o.Path,
 		Name:              o.Name,
+		ReplaceWith:       o.ReplaceWith,
 		IgnoreCase:        o.IgnoreCase,
 		ShowAbsolutePaths: o.ShowAbsolutePaths,
 	}
