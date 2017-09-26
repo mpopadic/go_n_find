@@ -16,24 +16,51 @@ package cmd
 
 import (
 	"fmt"
+	"io/ioutil"
+	"log"
 	"os"
+	"path"
+	"path/filepath"
+	"strings"
 
 	"github.com/spf13/cobra"
 )
 
+var (
+	pathFlag              string
+	nameFlag              string
+	replaceFlag           string
+	ignoreCaseFlag        bool
+	showAbsolutePathsFlag bool
+)
+
 // RootCmd represents the base command when called without any subcommands
 var RootCmd = &cobra.Command{
-	Use:   "go_n_find2",
-	Short: "A brief description of your application",
-	Long: `A longer description that spans multiple lines and likely contains
-examples and usage of using your application. For example:
-
-Cobra is a CLI library for Go that empowers applications.
-This application is a tool to generate the needed files
-to quickly create a Cobra application.`,
+	Use:   "go_n_find",
+	Short: "CLI for finding files and folders",
+	Long:  `CLI tool for finding files and folders by name or content`,
+	PreRunE: func(cmd *cobra.Command, args []string) error {
+		if nameFlag == "" {
+			return fmt.Errorf("name flag must be defined")
+		}
+		return nil
+	},
 	// Uncomment the following line if your bare application
 	// has an action associated with it:
-	//	Run: func(cmd *cobra.Command, args []string) { },
+	RunE: func(cmd *cobra.Command, args []string) error {
+		// fmt.Println(pathFlag, nameFlag)
+		fmt.Println("replace:", replaceFlag)
+		options := &findOptions{
+			Path:              pathFlag,
+			Name:              nameFlag,
+			IgnoreCase:        ignoreCaseFlag,
+			ShowAbsolutePaths: showAbsolutePathsFlag,
+		}
+		if err := findInTree(options); err != nil {
+			return err
+		}
+		return nil
+	},
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.
@@ -45,13 +72,77 @@ func Execute() {
 	}
 }
 
-func init() { 
-	// Here you will define your flags and configuration settings.
-	// Cobra supports persistent flags, which, if defined here,
-	// will be global for your application.
-	// RootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.go_n_find2.yaml)")
+func init() {
 
 	// Cobra also supports local flags, which will only run
 	// when this action is called directly.
-	RootCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+	RootCmd.Flags().StringVarP(&pathFlag, "path", "p", ".", "path to directory")
+	RootCmd.Flags().StringVarP(&nameFlag, "name", "n", "", "name of file or directory")
+	RootCmd.Flags().StringVarP(&replaceFlag, "replace", "r", "", "replace string")
+	RootCmd.Flags().BoolVarP(&ignoreCaseFlag, "ignore-case", "i", false, "ignore case flag")
+	RootCmd.Flags().BoolVarP(&showAbsolutePathsFlag, "absolute-paths", "a", false, "print absolute paths in result")
+
+}
+
+func findInTree(options *findOptions) error {
+	fileInfo, err := os.Stat(options.Path)
+	if err != nil {
+		return fmt.Errorf("could not get fileInfo for %s: %v", options.Path, err)
+	}
+
+	doAction(options)
+
+	if fileInfo.IsDir() {
+		files, err := ioutil.ReadDir(options.Path)
+		if err != nil {
+			return fmt.Errorf("could not read directory %s: %v", options.Path, err)
+		}
+		for _, file := range files {
+			childOptions := options.CreateCopy()
+			childOptions.Path = path.Join(options.Path, file.Name())
+			findInTree(childOptions)
+		}
+	}
+	return nil
+}
+
+func doAction(options *findOptions) {
+	if options.Name != "" {
+		var finalPathPrint = ""
+		if options.ShowAbsolutePaths {
+			p, err := filepath.Abs(options.Path)
+			if err != nil {
+				log.Fatalf("could not get absolute path: %v", err)
+			}
+			finalPathPrint = p
+		} else {
+			finalPathPrint = options.Path
+		}
+		if options.IgnoreCase {
+			if strings.Contains(strings.ToLower(options.Path), strings.ToLower(options.Name)) {
+				fmt.Println(finalPathPrint)
+			}
+		} else {
+			if strings.Contains(options.Path, options.Name) {
+				fmt.Println(finalPathPrint)
+			}
+		}
+	}
+}
+
+type findOptions struct {
+	Path              string
+	Name              string
+	IgnoreCase        bool
+	ShowAbsolutePaths bool
+}
+
+func (o *findOptions) CreateCopy() *findOptions {
+	newFindOptions := &findOptions{
+		Path:              o.Path,
+		Name:              o.Name,
+		IgnoreCase:        o.IgnoreCase,
+		ShowAbsolutePaths: o.ShowAbsolutePaths,
+	}
+	return newFindOptions
 }
