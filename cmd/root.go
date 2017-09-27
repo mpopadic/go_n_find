@@ -21,7 +21,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
-	"strings"
+	"regexp"
 
 	"github.com/spf13/cobra"
 )
@@ -92,8 +92,6 @@ func findInTree(options *findOptions) error {
 		return fmt.Errorf("could not get fileInfo for %s: %v", options.Path, err)
 	}
 
-	doAction(options)
-
 	if fileInfo.IsDir() {
 		files, err := ioutil.ReadDir(options.Path)
 		if err != nil {
@@ -105,10 +103,12 @@ func findInTree(options *findOptions) error {
 			findInTree(childOptions)
 		}
 	}
+
+	doAction(options, fileInfo.Name())
 	return nil
 }
 
-func doAction(options *findOptions) {
+func doAction(options *findOptions, fileName string) {
 	if options.Name != "" {
 		var finalPathPrint = ""
 		absolutePath, err := filepath.Abs(options.Path)
@@ -120,38 +120,24 @@ func doAction(options *findOptions) {
 		} else {
 			finalPathPrint = options.Path
 		}
+
+		re := regexp.MustCompile(options.Name)
 		if options.IgnoreCase {
-			if strings.Contains(strings.ToLower(filepath.Base(absolutePath)), strings.ToLower(options.Name)) {
-				if options.ReplaceWith != "" {
-					oldName := filepath.Base(absolutePath)
-					pathDir := filepath.Dir(absolutePath)
-					newName := strings.Replace(oldName, options.Name, options.ReplaceWith, -1)
+			re = regexp.MustCompile("(?i)" + options.Name)
+		}
 
-					err := os.Rename(absolutePath, filepath.FromSlash(path.Join(pathDir, newName)))
-					if err != nil {
-						fmt.Printf("could not rename file: %v", err)
-					}
-					fmt.Printf("%s => %s\n", absolutePath, filepath.FromSlash(path.Join(pathDir, newName)))
+		if re.MatchString(fileName) {
+			if options.ReplaceWith != "" {
+				pathDir := filepath.Dir(absolutePath)
+				newFileName := re.ReplaceAllString(fileName, options.ReplaceWith)
 
-				} else {
-					fmt.Println(finalPathPrint)
+				err := os.Rename(absolutePath, filepath.FromSlash(path.Join(pathDir, newFileName)))
+				if err != nil {
+					fmt.Printf("could not rename file: %v", err)
 				}
-			}
-		} else {
-			if strings.Contains(filepath.Base(absolutePath), options.Name) {
-				if options.ReplaceWith != "" {
-					oldName := filepath.Base(absolutePath)
-					pathDir := filepath.Dir(absolutePath)
-					newName := strings.Replace(oldName, options.Name, options.ReplaceWith, -1)
-
-					err := os.Rename(absolutePath, filepath.FromSlash(path.Join(pathDir, newName)))
-					if err != nil {
-						fmt.Printf("could not rename file: %v", err)
-					}
-					fmt.Printf("%s => %s\n", absolutePath, filepath.FromSlash(path.Join(pathDir, newName)))
-				} else {
-					fmt.Println(finalPathPrint)
-				}
+				fmt.Printf("%s => %s\n", absolutePath, filepath.FromSlash(path.Join(pathDir, newFileName)))
+			} else {
+				fmt.Println(finalPathPrint)
 			}
 		}
 	}
