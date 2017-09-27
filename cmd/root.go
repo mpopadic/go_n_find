@@ -86,8 +86,7 @@ func Execute() {
 
 func init() {
 	colors.InitColors()
-	// Cobra also supports local flags, which will only run
-	// when this action is called directly.
+
 	RootCmd.Flags().StringVarP(&pathFlag, "path", "p", "", "path to directory")
 	RootCmd.Flags().StringVarP(&nameFlag, "name", "n", "", "regular expression for matching file or directory name")
 	RootCmd.Flags().StringVarP(&replaceFlag, "replace", "r", "", "replaces mached regular expression parts with given value")
@@ -150,7 +149,6 @@ func doAction(options *findOptions, fileName string) {
 				colors.RED.Print(absolutePath)
 				colors.CYAN.Print(" => ")
 				colors.GREEN.Println(filepath.FromSlash(path.Join(pathDir, newFileName)))
-				// fmt.Printf("%s %s %s\n", absolutePath, colors.CyanString("=>"), filepath.FromSlash(path.Join(pathDir, newFileName)))
 			} else {
 				fmt.Println(filepath.FromSlash(finalPathPrint))
 			}
