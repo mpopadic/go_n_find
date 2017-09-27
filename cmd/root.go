@@ -23,6 +23,7 @@ import (
 	"path/filepath"
 	"regexp"
 
+	"github.com/mpopadic/go_n_find/colors"
 	"github.com/spf13/cobra"
 )
 
@@ -34,14 +35,21 @@ var (
 	showAbsolutePathsFlag bool
 )
 
+var (
+	_numberOfResults int
+)
+
 // RootCmd represents the base command when called without any subcommands
 var RootCmd = &cobra.Command{
 	Use:   "go_n_find",
 	Short: "CLI for finding files and folders",
 	Long:  `CLI tool for finding files and folders by name or content`,
 	PreRunE: func(cmd *cobra.Command, args []string) error {
+		if pathFlag == "" {
+			return fmt.Errorf("path flag is required")
+		}
 		if nameFlag == "" {
-			return fmt.Errorf("name flag must be defined")
+			return fmt.Errorf("name flag is required")
 		}
 		return nil
 	},
@@ -57,10 +65,12 @@ var RootCmd = &cobra.Command{
 			IgnoreCase:        ignoreCaseFlag,
 			ShowAbsolutePaths: showAbsolutePathsFlag,
 		}
-
+		_numberOfResults = 0
 		if err := findInTree(options); err != nil {
 			return err
 		}
+
+		colors.CYAN.Printf("Number of results: %d", _numberOfResults)
 		return nil
 	},
 }
@@ -75,13 +85,13 @@ func Execute() {
 }
 
 func init() {
-
+	colors.InitColors()
 	// Cobra also supports local flags, which will only run
 	// when this action is called directly.
-	RootCmd.Flags().StringVarP(&pathFlag, "path", "p", ".", "path to directory")
-	RootCmd.Flags().StringVarP(&nameFlag, "name", "n", "", "name of file or directory")
-	RootCmd.Flags().StringVarP(&replaceFlag, "replace", "r", "", "replace string")
-	RootCmd.Flags().BoolVarP(&ignoreCaseFlag, "ignore-case", "i", false, "ignore case flag")
+	RootCmd.Flags().StringVarP(&pathFlag, "path", "p", "", "path to directory")
+	RootCmd.Flags().StringVarP(&nameFlag, "name", "n", "", "regular expression for matching file or directory name")
+	RootCmd.Flags().StringVarP(&replaceFlag, "replace", "r", "", "replaces mached regular expression parts with given value")
+	RootCmd.Flags().BoolVarP(&ignoreCaseFlag, "ignore-case", "i", false, "ignore case")
 	RootCmd.Flags().BoolVarP(&showAbsolutePathsFlag, "absolute-paths", "a", false, "print absolute paths in result")
 
 }
@@ -120,6 +130,7 @@ func doAction(options *findOptions, fileName string) {
 		} else {
 			finalPathPrint = options.Path
 		}
+		finalPathPrint = filepath.Clean(finalPathPrint)
 
 		re := regexp.MustCompile(options.Name)
 		if options.IgnoreCase {
@@ -127,6 +138,7 @@ func doAction(options *findOptions, fileName string) {
 		}
 
 		if re.MatchString(fileName) {
+			_numberOfResults++
 			if options.ReplaceWith != "" {
 				pathDir := filepath.Dir(absolutePath)
 				newFileName := re.ReplaceAllString(fileName, options.ReplaceWith)
@@ -135,9 +147,12 @@ func doAction(options *findOptions, fileName string) {
 				if err != nil {
 					fmt.Printf("could not rename file: %v", err)
 				}
-				fmt.Printf("%s => %s\n", absolutePath, filepath.FromSlash(path.Join(pathDir, newFileName)))
+				colors.RED.Print(absolutePath)
+				colors.CYAN.Print(" => ")
+				colors.GREEN.Println(filepath.FromSlash(path.Join(pathDir, newFileName)))
+				// fmt.Printf("%s %s %s\n", absolutePath, colors.CyanString("=>"), filepath.FromSlash(path.Join(pathDir, newFileName)))
 			} else {
-				fmt.Println(finalPathPrint)
+				fmt.Println(filepath.FromSlash(finalPathPrint))
 			}
 		}
 	}

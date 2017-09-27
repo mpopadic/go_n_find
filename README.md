@@ -1,2 +1,4 @@
 # go_n_find
-CLI tool for finding files and folders
+CLI tool for finding files and folders and renaming them
+
+
