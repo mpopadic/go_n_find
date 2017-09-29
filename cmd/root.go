@@ -34,6 +34,7 @@ var (
 	ignoreCaseFlag        bool
 	showAbsolutePathsFlag bool
 	forceReplaceFlag      bool
+	contentFlag           string
 )
 
 var (
@@ -50,8 +51,8 @@ var RootCmd = &cobra.Command{
 		if pathFlag == "" {
 			return fmt.Errorf("path flag is required")
 		}
-		if nameFlag == "" {
-			return fmt.Errorf("name flag is required")
+		if nameFlag == "" && contentFlag == "" {
+			return fmt.Errorf("name flag or content flag are required")
 		}
 		return nil
 	},
@@ -63,6 +64,7 @@ var RootCmd = &cobra.Command{
 		options := &findOptions{
 			Path:              pathFlag,
 			Name:              nameFlag,
+			Content:           contentFlag,
 			ReplaceWith:       replaceFlag,
 			IgnoreCase:        ignoreCaseFlag,
 			ShowAbsolutePaths: showAbsolutePathsFlag,
@@ -116,6 +118,8 @@ func init() {
 	RootCmd.Flags().BoolVarP(&showAbsolutePathsFlag, "absolute-paths", "a", false, "print absolute paths in result")
 	RootCmd.Flags().BoolVarP(&forceReplaceFlag, "force-replace", "f", false, "Force replace without responding")
 
+	RootCmd.Flags().StringVarP(&contentFlag, "content", "c", "", "regular expression for matching file content")
+
 }
 
 func findInTree(options *findOptions) error {
@@ -154,9 +158,18 @@ func doAction(options *findOptions, fileName string) {
 		}
 		finalPathPrint = filepath.Clean(finalPathPrint)
 
-		re := regexp.MustCompile(options.Name)
+		// re := regexp.MustCompile(options.Name)
+		re, err := regexp.Compile(options.Name)
+		if err != nil {
+			colors.RED.Printf("regular expresion for name flag is not valid\n")
+			os.Exit(1)
+		}
 		if options.IgnoreCase {
-			re = regexp.MustCompile("(?i)" + options.Name)
+			re, err = regexp.Compile("(?i)" + options.Name)
+			if err != nil {
+				colors.RED.Printf("regular expresion for name flag is not valid\n")
+				os.Exit(1)
+			}
 		}
 
 		if re.MatchString(fileName) {
@@ -185,11 +198,15 @@ func doAction(options *findOptions, fileName string) {
 			}
 		}
 	}
+	if options.Content != "" {
+
+	}
 }
 
 type findOptions struct {
 	Path              string
 	Name              string
+	Content           string
 	ReplaceWith       string
 	IgnoreCase        bool
 	ShowAbsolutePaths bool
@@ -200,6 +217,7 @@ func (o *findOptions) CreateCopy() *findOptions {
 	newFindOptions := &findOptions{
 		Path:              o.Path,
 		Name:              o.Name,
+		Content:           o.Content,
 		ReplaceWith:       o.ReplaceWith,
 		IgnoreCase:        o.IgnoreCase,
 		ShowAbsolutePaths: o.ShowAbsolutePaths,
