@@ -21,8 +21,8 @@ import (
 
 // Version of CLI tool
 var (
-	Version   = "No version provided"
-	BuildTime string
+	Version = "No version provided"
+	// BuildTime = "No build time provided"
 )
 
 // versionCmd represents the version command
@@ -31,7 +31,7 @@ var versionCmd = &cobra.Command{
 	Short: "Prints version number",
 	Long:  `Prints version number`,
 	Run: func(cmd *cobra.Command, args []string) {
-		colors.CYAN.Printf("version: %s\nBuildTime: %s\n", Version, BuildTime)
+		colors.CYAN.Printf("version: %s\n", Version)
 	},
 }
 

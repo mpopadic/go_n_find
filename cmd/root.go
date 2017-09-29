@@ -33,10 +33,12 @@ var (
 	replaceFlag           string
 	ignoreCaseFlag        bool
 	showAbsolutePathsFlag bool
+	forceReplaceFlag      bool
 )
 
 var (
 	_numberOfResults int
+	_renameMap       map[string]string
 )
 
 // RootCmd represents the base command when called without any subcommands
@@ -64,13 +66,33 @@ var RootCmd = &cobra.Command{
 			ReplaceWith:       replaceFlag,
 			IgnoreCase:        ignoreCaseFlag,
 			ShowAbsolutePaths: showAbsolutePathsFlag,
+			ForceReplace:      forceReplaceFlag,
 		}
+
 		_numberOfResults = 0
+
+		if options.ReplaceWith != "" && !options.ForceReplace {
+			_renameMap = make(map[string]string)
+		}
+
 		if err := findInTree(options); err != nil {
 			return err
 		}
 
-		colors.CYAN.Printf("Number of results: %d", _numberOfResults)
+		colors.CYAN.Printf("Number of results: %d\n", _numberOfResults)
+		if options.ReplaceWith != "" && !options.ForceReplace {
+			response := waitResponse("Are you sure? [Yes/No] ", map[string][]string{
+				"Yes": []string{"Yes", "Y", "y"},
+				"No":  []string{"No", "N", "n"},
+			})
+			switch response {
+			case "Yes":
+				renamePaths(_renameMap)
+			case "No":
+				colors.RED.Print(response)
+			}
+		}
+
 		return nil
 	},
 }
@@ -92,6 +114,7 @@ func init() {
 	RootCmd.Flags().StringVarP(&replaceFlag, "replace", "r", "", "replaces mached regular expression parts with given value")
 	RootCmd.Flags().BoolVarP(&ignoreCaseFlag, "ignore-case", "i", false, "ignore case")
 	RootCmd.Flags().BoolVarP(&showAbsolutePathsFlag, "absolute-paths", "a", false, "print absolute paths in result")
+	RootCmd.Flags().BoolVarP(&forceReplaceFlag, "force-replace", "f", false, "Force replace without responding")
 
 }
 
@@ -142,13 +165,21 @@ func doAction(options *findOptions, fileName string) {
 				pathDir := filepath.Dir(absolutePath)
 				newFileName := re.ReplaceAllString(fileName, options.ReplaceWith)
 
-				err := os.Rename(absolutePath, filepath.FromSlash(path.Join(pathDir, newFileName)))
-				if err != nil {
-					fmt.Printf("could not rename file: %v", err)
+				if options.ForceReplace {
+					err := os.Rename(absolutePath, filepath.FromSlash(path.Join(pathDir, newFileName)))
+					if err != nil {
+						fmt.Printf("could not rename file: %v", err)
+					}
+					colors.RED.Print(absolutePath)
+					colors.CYAN.Print(" => ")
+					colors.GREEN.Println(filepath.FromSlash(path.Join(pathDir, newFileName)))
+				} else {
+					_renameMap[absolutePath] = filepath.FromSlash(path.Join(pathDir, newFileName))
+
+					fmt.Print(absolutePath)
+					colors.CYAN.Print(" => ")
+					fmt.Println(filepath.FromSlash(path.Join(pathDir, newFileName)))
 				}
-				colors.RED.Print(absolutePath)
-				colors.CYAN.Print(" => ")
-				colors.GREEN.Println(filepath.FromSlash(path.Join(pathDir, newFileName)))
 			} else {
 				fmt.Println(filepath.FromSlash(finalPathPrint))
 			}
@@ -162,6 +193,7 @@ type findOptions struct {
 	ReplaceWith       string
 	IgnoreCase        bool
 	ShowAbsolutePaths bool
+	ForceReplace      bool
 }
 
 func (o *findOptions) CreateCopy() *findOptions {
@@ -171,6 +203,39 @@ func (o *findOptions) CreateCopy() *findOptions {
 		ReplaceWith:       o.ReplaceWith,
 		IgnoreCase:        o.IgnoreCase,
 		ShowAbsolutePaths: o.ShowAbsolutePaths,
+		ForceReplace:      o.ForceReplace,
 	}
 	return newFindOptions
+}
+
+func waitResponse(question string, responseAliases map[string][]string) string {
+	colors.YELLOW.Printf("%s ", question)
+	var respond string
+
+	for {
+		fmt.Scanf("%s\n", &respond)
+
+		for response, aliases := range responseAliases {
+			for _, alias := range aliases {
+				if respond == alias {
+					return response
+				}
+			}
+		}
+
+		colors.YELLOW.Printf("%s ", question)
+	}
+}
+
+func renamePaths(paths map[string]string) error {
+	for oldPath, newPath := range paths {
+		err := os.Rename(oldPath, newPath)
+		if err != nil {
+			return fmt.Errorf("could not rename file: %v", err)
+		}
+		colors.RED.Print(oldPath)
+		colors.CYAN.Print(" => ")
+		colors.GREEN.Println(newPath)
+	}
+	return nil
 }
