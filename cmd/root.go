@@ -22,6 +22,7 @@ import (
 	"path"
 	"path/filepath"
 	"regexp"
+	"strings"
 
 	"github.com/mpopadic/go_n_find/colors"
 	"github.com/spf13/cobra"
@@ -140,43 +141,25 @@ func findInTree(options *findOptions) error {
 		}
 	}
 
-	doAction(options, fileInfo.Name())
+	doAction(options, fileInfo)
 	return nil
 }
 
-func doAction(options *findOptions, fileName string) {
+func doAction(options *findOptions, fileInfo os.FileInfo) {
+	absolutePath, err := filepath.Abs(options.Path)
+	if err != nil {
+		log.Fatalf("could not get absolute path: %v", err)
+	}
+	finalPathPrint := getPathPrintFormat(options.Path, absolutePath, options.ShowAbsolutePaths)
+
 	if options.Name != "" {
-		var finalPathPrint = ""
-		absolutePath, err := filepath.Abs(options.Path)
-		if err != nil {
-			log.Fatalf("could not get absolute path: %v", err)
-		}
-		if options.ShowAbsolutePaths {
-			finalPathPrint = absolutePath
-		} else {
-			finalPathPrint = options.Path
-		}
-		finalPathPrint = filepath.Clean(finalPathPrint)
+		re := createRegex(options.Name, options.IgnoreCase)
 
-		// re := regexp.MustCompile(options.Name)
-		re, err := regexp.Compile(options.Name)
-		if err != nil {
-			colors.RED.Printf("regular expresion for name flag is not valid\n")
-			os.Exit(1)
-		}
-		if options.IgnoreCase {
-			re, err = regexp.Compile("(?i)" + options.Name)
-			if err != nil {
-				colors.RED.Printf("regular expresion for name flag is not valid\n")
-				os.Exit(1)
-			}
-		}
-
-		if re.MatchString(fileName) {
+		if re.MatchString(fileInfo.Name()) {
 			_numberOfResults++
 			if options.ReplaceWith != "" {
 				pathDir := filepath.Dir(absolutePath)
-				newFileName := re.ReplaceAllString(fileName, options.ReplaceWith)
+				newFileName := re.ReplaceAllString(fileInfo.Name(), options.ReplaceWith)
 
 				if options.ForceReplace {
 					err := os.Rename(absolutePath, filepath.FromSlash(path.Join(pathDir, newFileName)))
@@ -199,7 +182,38 @@ func doAction(options *findOptions, fileName string) {
 		}
 	}
 	if options.Content != "" {
+		if !fileInfo.IsDir() {
+			re := createRegex(options.Content, options.IgnoreCase)
 
+			fileBytes, err := ioutil.ReadFile(absolutePath)
+			if err != nil {
+				log.Fatalf("could not read file content: %v", err)
+			}
+			fileString := string(fileBytes)
+
+			fileLines := strings.Split(fileString, "\n")
+
+			printedFileName := false
+			for lineNumber, line := range fileLines {
+				if re.MatchString(line) {
+					_numberOfResults++
+					if !printedFileName {
+						colors.CYAN.Printf("%s:\n", finalPathPrint)
+						printedFileName = !printedFileName
+					}
+					allIndexes := re.FindAllStringIndex(line, -1)
+
+					colors.YELLOW.Printf("%v:", lineNumber+1)
+					location := 0
+					for _, match := range allIndexes {
+						fmt.Printf("%s", line[location:match[0]])
+						colors.GREEN.Printf("%s", line[match[0]:match[1]])
+						location = match[1]
+					}
+					fmt.Println()
+				}
+			}
+		}
 	}
 }
 
@@ -256,4 +270,30 @@ func renamePaths(paths map[string]string) error {
 		colors.GREEN.Println(newPath)
 	}
 	return nil
+}
+
+func getPathPrintFormat(filePath, absolutePath string, showAbsolute bool) string {
+	var result = ""
+	if showAbsolute {
+		result = absolutePath
+	} else {
+		result = filePath
+	}
+	return filepath.Clean(result)
+}
+
+func createRegex(text string, ignoreCase bool) *regexp.Regexp {
+	re, err := regexp.Compile(text)
+	if err != nil {
+		colors.RED.Printf("regular expresion for name flag is not valid\n")
+		os.Exit(1)
+	}
+	if ignoreCase {
+		re, err = regexp.Compile("(?i)" + text)
+		if err != nil {
+			colors.RED.Printf("regular expresion for name flag is not valid\n")
+			os.Exit(1)
+		}
+	}
+	return re
 }
