@@ -2,16 +2,17 @@
 
 CLI tool for finding files and folders and renaming them
 
-Build Command:
+
+Build Commands:
 
 ```cmd
 
-go build -ldflags="-X github.com/mpopadic/go_n_find/cmd.Version=v1.0.0 -X github.com/mpopadic/go_n_find/cmd.BuildTime=${BUILD_TIME}"
+go build -ldflags="-X github.com/mpopadic/go_n_find/cmd.Version=v1.0.0"
 
 ```
 
 ```cmd
 
-gox -output="bin/{{.OS}}_{{.Arch}}/{{.Dir}}" -osarch="linux/amd64 windows/amd64" -ldflags="-X github.com/mpopadic/go_n_find/cmd.Version=v1.0.0 -X github.com/mpopadic/go_n_find/cmd.BuildTime=${BUILD_TIME}"
+gox -output="bin/{{.OS}}_{{.Arch}}/{{.Dir}}" -osarch="linux/amd64 windows/amd64" -ldflags="-X github.com/mpopadic/go_n_find/cmd.Version=v1.0.0"
 
 ```
