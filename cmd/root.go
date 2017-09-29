@@ -198,6 +198,7 @@ func doAction(options *findOptions, fileInfo os.FileInfo) {
 						colors.GREEN.Printf("%s", line[match[0]:match[1]])
 						location = match[1]
 					}
+					fmt.Printf("%s", line[location:])
 					fmt.Println()
 				}
 			}
