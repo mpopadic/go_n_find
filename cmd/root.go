@@ -101,12 +101,11 @@ func init() {
 	colors.InitColors()
 
 	RootCmd.Flags().StringVarP(&pathFlag, "path", "p", "", "path to directory")
-	RootCmd.Flags().StringVarP(&nameFlag, "name", "n", "", "regular expression for matching file or directory name")
+	RootCmd.Flags().StringVarP(&nameFlag, "name", "n", "", "regular expression for matching file or directory name; This flag filter files if content flag is used")
 	RootCmd.Flags().StringVarP(&replaceFlag, "replace", "r", "", "replaces mached regular expression parts with given value")
-	RootCmd.Flags().BoolVarP(&ignoreCaseFlag, "ignore-case", "i", false, "ignore case")
+	RootCmd.Flags().BoolVarP(&ignoreCaseFlag, "ignore-case", "i", false, "ignore case for all regular expresions; Add '(?i)' in front of specific regex for ignore case")
 	RootCmd.Flags().BoolVarP(&showAbsolutePathsFlag, "absolute-paths", "a", false, "print absolute paths in result")
 	RootCmd.Flags().BoolVarP(&forceReplaceFlag, "force-replace", "f", false, "Force replace without responding")
-
 	RootCmd.Flags().StringVarP(&contentFlag, "content", "c", "", "regular expression for matching file content")
 
 }
@@ -140,7 +139,7 @@ func doAction(options *findOptions, fileInfo os.FileInfo) {
 	}
 	finalPathPrint := getPathPrintFormat(options.Path, absolutePath, options.ShowAbsolutePaths)
 
-	if options.Name != "" {
+	if options.Name != "" && options.Content == "" {
 		re := createRegex(options.Name, options.IgnoreCase)
 
 		if re.MatchString(fileInfo.Name()) {
@@ -170,36 +169,73 @@ func doAction(options *findOptions, fileInfo os.FileInfo) {
 		}
 	}
 	if options.Content != "" {
-		if !fileInfo.IsDir() {
-			re := createRegex(options.Content, options.IgnoreCase)
+		if options.Name != "" {
+			regName := createRegex(options.Name, options.IgnoreCase)
+			if regName.MatchString(fileInfo.Name()) && !fileInfo.IsDir() {
+				re := createRegex(options.Content, options.IgnoreCase)
 
-			fileBytes, err := ioutil.ReadFile(absolutePath)
-			if err != nil {
-				log.Fatalf("could not read file content: %v", err)
+				fileBytes, err := ioutil.ReadFile(absolutePath)
+				if err != nil {
+					log.Fatalf("could not read file content: %v", err)
+				}
+				fileString := string(fileBytes)
+
+				fileLines := strings.Split(fileString, "\n")
+
+				printedFileName := false
+				for lineNumber, line := range fileLines {
+					if re.MatchString(line) {
+						_numberOfResults++
+						if !printedFileName {
+							colors.CYAN.Printf("%s:\n", finalPathPrint)
+							printedFileName = !printedFileName
+						}
+						allIndexes := re.FindAllStringIndex(line, -1)
+
+						colors.YELLOW.Printf("%v:", lineNumber+1)
+						location := 0
+						for _, match := range allIndexes {
+							fmt.Printf("%s", line[location:match[0]])
+							colors.GREEN.Printf("%s", line[match[0]:match[1]])
+							location = match[1]
+						}
+						fmt.Printf("%s", line[location:])
+						fmt.Println()
+					}
+				}
 			}
-			fileString := string(fileBytes)
+		} else {
+			if !fileInfo.IsDir() {
+				re := createRegex(options.Content, options.IgnoreCase)
 
-			fileLines := strings.Split(fileString, "\n")
+				fileBytes, err := ioutil.ReadFile(absolutePath)
+				if err != nil {
+					log.Fatalf("could not read file content: %v", err)
+				}
+				fileString := string(fileBytes)
 
-			printedFileName := false
-			for lineNumber, line := range fileLines {
-				if re.MatchString(line) {
-					_numberOfResults++
-					if !printedFileName {
-						colors.CYAN.Printf("%s:\n", finalPathPrint)
-						printedFileName = !printedFileName
+				fileLines := strings.Split(fileString, "\n")
+
+				printedFileName := false
+				for lineNumber, line := range fileLines {
+					if re.MatchString(line) {
+						_numberOfResults++
+						if !printedFileName {
+							colors.CYAN.Printf("%s:\n", finalPathPrint)
+							printedFileName = !printedFileName
+						}
+						allIndexes := re.FindAllStringIndex(line, -1)
+
+						colors.YELLOW.Printf("%v:", lineNumber+1)
+						location := 0
+						for _, match := range allIndexes {
+							fmt.Printf("%s", line[location:match[0]])
+							colors.GREEN.Printf("%s", line[match[0]:match[1]])
+							location = match[1]
+						}
+						fmt.Printf("%s", line[location:])
+						fmt.Println()
 					}
-					allIndexes := re.FindAllStringIndex(line, -1)
-
-					colors.YELLOW.Printf("%v:", lineNumber+1)
-					location := 0
-					for _, match := range allIndexes {
-						fmt.Printf("%s", line[location:match[0]])
-						colors.GREEN.Printf("%s", line[match[0]:match[1]])
-						location = match[1]
-					}
-					fmt.Printf("%s", line[location:])
-					fmt.Println()
 				}
 			}
 		}
