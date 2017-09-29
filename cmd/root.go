@@ -27,8 +27,9 @@ var (
 )
 
 var (
-	_numberOfResults int
-	_renameMap       map[string]string
+	_numberOfResults     int
+	_renameMap           map[string]string
+	_replaceContentFiles []string
 )
 
 // RootCmd represents the base command when called without any subcommands
@@ -71,7 +72,20 @@ var RootCmd = &cobra.Command{
 		}
 
 		colors.CYAN.Printf("Number of results: %d\n", _numberOfResults)
-		if options.ReplaceWith != "" && !options.ForceReplace {
+		if options.ReplaceWith != "" && !options.ForceReplace && options.Content == "" {
+			response := waitResponse("Are you sure? [Yes/No] ", map[string][]string{
+				"Yes": []string{"Yes", "Y", "y"},
+				"No":  []string{"No", "N", "n"},
+			})
+			switch response {
+			case "Yes":
+				renamePaths(_renameMap)
+			case "No":
+				colors.RED.Print(response)
+			}
+		}
+
+		if options.ReplaceWith != "" && !options.ForceReplace && options.Content != "" {
 			response := waitResponse("Are you sure? [Yes/No] ", map[string][]string{
 				"Yes": []string{"Yes", "Y", "y"},
 				"No":  []string{"No", "N", "n"},
@@ -321,4 +335,23 @@ func createRegex(text string, ignoreCase bool) *regexp.Regexp {
 		}
 	}
 	return re
+}
+
+func replaceContent(filePaths []string, oldContent *regexp.Regexp, newContent string, fileInfo os.FileInfo) {
+	for _, filePath := range filePaths {
+		fileBytes, err := ioutil.ReadFile(filePath)
+		if err != nil {
+			log.Fatalf("could not read file content: %v", err)
+		}
+		fileString := string(fileBytes)
+
+		newFileString := oldContent.ReplaceAllString(fileString, newContent)
+
+		err = ioutil.WriteFile(filePath, []byte(newFileString), fileInfo.Mode())
+		if err != nil {
+			fmt.Printf("could not write to file: %v", err)
+		} else {
+			colors.GREEN.Printf("%s\n", filePath)
+		}
+	}
 }
