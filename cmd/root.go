@@ -92,7 +92,12 @@ var RootCmd = &cobra.Command{
 			})
 			switch response {
 			case "Yes":
-				renamePaths(_renameMap)
+				reg, err := regexp.Compile(options.Content)
+				if err != nil {
+					colors.RED.Printf("invalid content regular expresion\n")
+					os.Exit(1)
+				}
+				replaceContent(_replaceContentFiles, reg, options.ReplaceWith)
 			case "No":
 				colors.RED.Print(response)
 			}
@@ -186,6 +191,7 @@ func doAction(options *findOptions, fileInfo os.FileInfo) {
 		if options.Name != "" {
 			regName := createRegex(options.Name, options.IgnoreCase)
 			if regName.MatchString(fileInfo.Name()) && !fileInfo.IsDir() {
+				_replaceContentFiles = append(_replaceContentFiles, absolutePath)
 				re := createRegex(options.Content, options.IgnoreCase)
 
 				fileBytes, err := ioutil.ReadFile(absolutePath)
@@ -220,6 +226,7 @@ func doAction(options *findOptions, fileInfo os.FileInfo) {
 			}
 		} else {
 			if !fileInfo.IsDir() {
+				_replaceContentFiles = append(_replaceContentFiles, absolutePath)
 				re := createRegex(options.Content, options.IgnoreCase)
 
 				fileBytes, err := ioutil.ReadFile(absolutePath)
@@ -337,8 +344,13 @@ func createRegex(text string, ignoreCase bool) *regexp.Regexp {
 	return re
 }
 
-func replaceContent(filePaths []string, oldContent *regexp.Regexp, newContent string, fileInfo os.FileInfo) {
+func replaceContent(filePaths []string, oldContent *regexp.Regexp, newContent string) {
 	for _, filePath := range filePaths {
+
+		fileInfo, err := os.Stat(filePath)
+		if err != nil {
+			log.Fatalf("could not get file info; %v", err)
+		}
 		fileBytes, err := ioutil.ReadFile(filePath)
 		if err != nil {
 			log.Fatalf("could not read file content: %v", err)
