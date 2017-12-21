@@ -72,34 +72,47 @@ var RootCmd = &cobra.Command{
 		}
 
 		colors.CYAN.Printf("Number of results: %d\n", _numberOfResults)
-		if options.ReplaceWith != "" && !options.ForceReplace && options.Content == "" {
-			response := waitResponse("Are you sure? [Yes/No] ", map[string][]string{
-				"Yes": []string{"Yes", "Y", "y"},
-				"No":  []string{"No", "N", "n"},
-			})
-			switch response {
-			case "Yes":
+		if options.ReplaceWith != "" && options.Content == "" {
+			if !options.ForceReplace {
+				response := waitResponse("Are you sure? [Yes/No] ", map[string][]string{
+					"Yes": []string{"Yes", "Y", "y"},
+					"No":  []string{"No", "N", "n"},
+				})
+				switch response {
+				case "Yes":
+					renamePaths(_renameMap)
+				case "No":
+					colors.RED.Print(response)
+				}
+			} else {
 				renamePaths(_renameMap)
-			case "No":
-				colors.RED.Print(response)
 			}
 		}
 
-		if options.ReplaceWith != "" && !options.ForceReplace && options.Content != "" {
-			response := waitResponse("Are you sure? [Yes/No] ", map[string][]string{
-				"Yes": []string{"Yes", "Y", "y"},
-				"No":  []string{"No", "N", "n"},
-			})
-			switch response {
-			case "Yes":
+		if options.ReplaceWith != "" && options.Content != "" {
+			if !options.ForceReplace {
+				response := waitResponse("Are you sure? [Yes/No] ", map[string][]string{
+					"Yes": []string{"Yes", "Y", "y"},
+					"No":  []string{"No", "N", "n"},
+				})
+				switch response {
+				case "Yes":
+					reg, err := regexp.Compile(options.Content)
+					if err != nil {
+						colors.RED.Printf("invalid content regular expresion\n")
+						os.Exit(1)
+					}
+					replaceContent(_replaceContentFiles, reg, options.ReplaceWith)
+				case "No":
+					colors.RED.Print(response)
+				}
+			} else {
 				reg, err := regexp.Compile(options.Content)
 				if err != nil {
 					colors.RED.Printf("invalid content regular expresion\n")
 					os.Exit(1)
 				}
 				replaceContent(_replaceContentFiles, reg, options.ReplaceWith)
-			case "No":
-				colors.RED.Print(response)
 			}
 		}
 
