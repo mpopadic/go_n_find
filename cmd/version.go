@@ -9,7 +9,7 @@ import (
 
 // Version of CLI tool
 var (
-	Version = "No version provided"
+	Version = "v1.0.0"
 )
 
 // versionCmd represents the version command
