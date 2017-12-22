@@ -2,15 +2,9 @@ Build Commands:
 
 ```cmd
 
-go build -ldflags="-X github.com/mpopadic/go_n_find/cmd.Version=v1.0.0"
+windows: build.bat version_number
 
-```
-
-```cmd
-
-windows: build.bat
-
-linux: build.sh
+linux: build.sh version_number
 
 
 ```
