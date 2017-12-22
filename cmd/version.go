@@ -10,7 +10,6 @@ import (
 // Version of CLI tool
 var (
 	Version = "No version provided"
-	// BuildTime = "No build time provided"
 )
 
 // versionCmd represents the version command
